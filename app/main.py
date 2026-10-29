@@ -45,7 +45,7 @@ def list_links(store: Store) -> list[LinkOut]:
 
 @app.get("/{code}")
 def follow_link(code: str, store: Store) -> RedirectResponse:
-    link = store.get(code)
+    link = store.record_click(code)
     if link is None:
         raise HTTPException(status_code=404, detail="unknown code")
     return RedirectResponse(link.url, status_code=307)
