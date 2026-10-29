@@ -6,8 +6,12 @@ from app.store import LinkStore
 
 
 @pytest.fixture
-def client():
-    store = LinkStore()
+def store():
+    return LinkStore()
+
+
+@pytest.fixture
+def client(store):
     app.dependency_overrides[get_store] = lambda: store
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -45,3 +49,28 @@ def test_list_is_newest_first(client):
 def test_invalid_url_is_422(client):
     r = client.post("/links", json={"url": "not a url"})
     assert r.status_code == 422
+
+
+def test_each_redirect_adds_one_click(client, store):
+    code = client.post("/links", json={"url": "https://glassflow.ai"}).json()["code"]
+    for _ in range(2):
+        r = client.get(f"/{code}", follow_redirects=False)
+        assert r.status_code == 307
+    link = store.get(code)
+    assert link.clicks == 2
+    assert link.last_clicked_at is not None
+
+
+def test_unknown_code_does_not_add_a_click(client, store):
+    code = client.post("/links", json={"url": "https://glassflow.ai"}).json()["code"]
+    r = client.get("/nope00", follow_redirects=False)
+    assert r.status_code == 404
+    assert store.get(code).clicks == 0
+
+
+def test_list_items_keep_their_keys_after_clicks(client):
+    code = client.post("/links", json={"url": "https://glassflow.ai"}).json()["code"]
+    client.get(f"/{code}", follow_redirects=False)
+    items = client.get("/links").json()
+    assert len(items) == 1
+    assert set(items[0]) == {"code", "url", "created_at"}
