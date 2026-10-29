@@ -29,6 +29,14 @@ class LinkOut(BaseModel):
     created_at: datetime
 
 
+class StatsOut(BaseModel):
+    code: str
+    url: str
+    clicks: int
+    created_at: datetime
+    last_clicked_at: datetime | None
+
+
 def _out(link: Link) -> LinkOut:
     return LinkOut(code=link.code, url=link.url, created_at=link.created_at)
 
@@ -41,6 +49,20 @@ def create_link(body: LinkIn, store: Store) -> LinkOut:
 @app.get("/links", response_model=list[LinkOut])
 def list_links(store: Store) -> list[LinkOut]:
     return [_out(link) for link in store.all()]
+
+
+@app.get("/links/{code}/stats", response_model=StatsOut)
+def link_stats(code: str, store: Store) -> StatsOut:
+    link = store.snapshot(code)
+    if link is None:
+        raise HTTPException(status_code=404, detail="unknown code")
+    return StatsOut(
+        code=link.code,
+        url=link.url,
+        clicks=link.clicks,
+        created_at=link.created_at,
+        last_clicked_at=link.last_clicked_at,
+    )
 
 
 @app.get("/{code}")
